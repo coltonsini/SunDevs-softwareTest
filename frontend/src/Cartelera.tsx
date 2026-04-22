@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import 'cartelera.css';
+// import 'cartelera.css';
 
 // ─── TIPOS ────────────────────────────────────────────────
 interface Video {
