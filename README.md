@@ -8,28 +8,30 @@ This project is a **monorepo** containing a NestJS API and a React + Vite fronte
 
 ```
 SunDevs-softwareTest/
-├── package.json          ← Root package: runs both apps together
+├── package.json               ← Root: runs both apps together
 ├── README.md
+├── .gitignore
 │
-├── backend/              ← NestJS API (port 3000)
-│   ├── .env              ← ⚠️ You must create this (not committed)
+├── backend/
+│   ├── .env.example           ← Copy this → .env and fill in your values
 │   └── src/
 │       ├── main.ts
 │       ├── app.module.ts
+│       ├── guards/
+│       │   └── api-key.guard.ts
 │       └── videos/
 │           ├── mock-data.json
 │           ├── videos.controller.ts
 │           ├── videos.service.ts
 │           └── videos.module.ts
-│       └── guards/
-│           └── api-key.guard.ts
 │
-└── frontend/             ← React + Vite app (port 5173)
-    ├── .env              ← ⚠️ You must create this (not committed)
+└── frontend/
+    ├── .env.example           ← Copy this → .env and fill in your values
     └── src/
         ├── main.tsx
         ├── App.tsx
-        └── Cartelera.tsx
+        ├── Cartelera.tsx
+        └── Cartelera.css
 ```
 
 ---
@@ -39,13 +41,11 @@ SunDevs-softwareTest/
 > **Before starting, make sure you have the following installed:**
 
 1. **Node.js v18+ and npm** — Download from [nodejs.org](https://nodejs.org/).
-
 2. **NestJS CLI**
    ```bash
    npm install -g @nestjs/cli
    ```
-
-3. **Git** *(optional, to clone the repo)* — Download from [git-scm.com](https://git-scm.com/).
+3. **Git** *(optional)* — Download from [git-scm.com](https://git-scm.com/).
 
 ---
 
@@ -62,12 +62,24 @@ cd SunDevs-softwareTest
 
 ### 2. Configure Environment Variables
 
-The backend and frontend each need a `.env` file. **These are not committed to Git**, so you must create them manually.
+Each app ships with a `.env.example`. Copy it and fill in your values:
+
+```bash
+# Backend
+cp backend/.env.example backend/.env
+
+# Frontend
+cp frontend/.env.example frontend/.env
+```
+
+Then open both `.env` files and set the same secret key in both:
 
 **`backend/.env`**
 ```env
 API_KEY=your_secret_key_here
 PORT=3000
+FRONTEND_URL=http://localhost:5173
+SWAGGER_ENABLED=true
 ```
 
 **`frontend/.env`**
@@ -75,80 +87,49 @@ PORT=3000
 VITE_API_KEY=your_secret_key_here
 ```
 
-> ⚠️ Use the **same value** for `API_KEY` and `VITE_API_KEY`. This is the shared secret between both apps.
-> Also you can use this website to generate a safe API_KEY to do the testing [api-key-generator](https://www.strongdm.com/tools/api-key-generator).
+> ⚠️ `API_KEY` and `VITE_API_KEY` must be **identical**. To generate a secure key run:
+> ```bash
+> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+> ```
 
 ---
 
-### 3. Install All Dependencies
+### 3. Install Dependencies
 
-From the **root** of the project, run:
+From the **root** of the project:
 
 ```bash
 npm run install:all
 ```
 
-This installs dependencies for both `backend/` and `frontend/` in one step.
-
 ---
 
-### 4. Run Both Apps Together
+### 4. Run Both Apps
 
 ```bash
 npm run dev
 ```
 
-That's it. Both servers start in the same terminal with color-coded logs:
-
 | Color | App | URL |
 |-------|-----|-----|
-| 🔵 Cyan | Backend (NestJS) | http://localhost:3000/api/videos |
+| 🔵 Cyan | Backend (NestJS) | http://localhost:3000 |
 | 🟣 Magenta | Frontend (React) | http://localhost:5173 |
 
-> The `dev` command uses `concurrently` (installed as a root dev dependency) to run both apps in parallel.
-
 ---
 
-### Running Apps Individually *(optional)*
+## API Documentation (Swagger)
 
-If you need to run only one app at a time:
+With the backend running, open:
 
-```bash
-# Backend only
-cd backend && npm run start:dev
-
-# Frontend only
-cd frontend && npm run dev
+```
+http://localhost:3000/docs
 ```
 
----
+1. Click **Authorize** (top right)
+2. Enter your `API_KEY` value
+3. Click **Try it out** on any endpoint → **Execute**
 
-## Root `package.json` Reference
-
-The root `package.json` must look like this for the commands above to work:
-
-```json
-{
-  "name": "sundevs-backendtest",
-  "scripts": {
-    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run start:dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.0"
-  }
-}
-```
-
----
-
-## Environment Variables Reference
-
-| Variable | File | Description | Required |
-|----------|------|-------------|----------|
-| `API_KEY` | `backend/.env` | Secret key the backend validates on every request | ✅ Yes |
-| `PORT` | `backend/.env` | Port for the NestJS server (default: `3000`) | ❌ Optional |
-| `VITE_API_KEY` | `frontend/.env` | Same secret key, sent by React in the `x-api-key` header | ✅ Yes |
+> To disable Swagger in production, set `SWAGGER_ENABLED=false` in `backend/.env`.
 
 ---
 
@@ -156,11 +137,15 @@ The root `package.json` must look like this for the commands above to work:
 
 ### `GET /api/videos`
 
-Returns a clean, enriched list of videos sorted by Hype Level.
-
 **Required header:**
 ```
 x-api-key: your_secret_key_here
+```
+
+**Quick test with curl:**
+```bash
+curl -X GET http://localhost:3000/api/videos \
+  -H "x-api-key: your_secret_key_here"
 ```
 
 **Response example:**
@@ -182,20 +167,50 @@ x-api-key: your_secret_key_here
 hypeLevel = (likes + comments) / views
 ```
 
-**Business rule modifiers:**
-- If the title contains `"tutorial"` (case-insensitive) → multiply hype × 2
-- If comments are disabled (property absent) → hype = 0
+Modifiers:
+- Title contains `"tutorial"` (case-insensitive) → hype × 2
+- Comments disabled (property absent) → hype = 0
+
+---
+
+## Root `package.json`
+
+```json
+{
+  "name": "sundevs-softwaretest",
+  "scripts": {
+    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run start:dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "8.2.0"
+  }
+}
+```
+
+---
+
+## Environment Variables Reference
+
+| Variable | File | Description | Required |
+|----------|------|-------------|----------|
+| `API_KEY` | `backend/.env` | Secret key validated on every request | ✅ Yes |
+| `PORT` | `backend/.env` | NestJS server port (default: `3000`) | ❌ Optional |
+| `FRONTEND_URL` | `backend/.env` | Allowed CORS origin | ❌ Optional |
+| `SWAGGER_ENABLED` | `backend/.env` | Set `false` to hide docs in production | ❌ Optional |
+| `VITE_API_KEY` | `frontend/.env` | Same secret, sent in `x-api-key` header | ✅ Yes |
 
 ---
 
 ## Security
 
-| Layer | Implementation |
-|-------|---------------|
-| API Key guard | Custom `ApiKeyGuard` in `backend/src/guards/` — no extra install needed, uses `@nestjs/common` |
-| HTTP security headers | `helmet` npm package (`npm install helmet` inside `backend/`) — activated with `app.use(helmet())` in `main.ts` |
-| CORS | Restricted to `http://localhost:5173` in dev. Set `FRONTEND_URL` env var for production. |
-| Secrets | All keys live in `.env` files, never in source code. Both `.env` files are in `.gitignore`. |
+| Layer | Details |
+|-------|---------|
+| **API Key Guard** | Custom `ApiKeyGuard` — no extra install, uses `@nestjs/common` |
+| **HTTP Headers** | `helmet` — activated with `app.use(helmet())` in `main.ts` |
+| **CORS** | Restricted to `FRONTEND_URL`. Update for production. |
+| **Swagger in prod** | Set `SWAGGER_ENABLED=false` to disable public docs. |
+| **Secrets** | All keys in `.env` files (gitignored). Use `.env.example` as template. |
 
 ---
 
@@ -203,8 +218,9 @@ hypeLevel = (likes + comments) / views
 
 | Problem | Solution |
 |---------|----------|
-| `EADDRINUSE` on port 3000 or 5173 | Another process is using the port. Run `lsof -i :3000` (or `:5173`) and kill it. |
-| CORS error in browser | Confirm the backend is running and `enableCors` origin in `main.ts` matches your frontend URL. |
-| `401 Unauthorized` | Check that `API_KEY` in `backend/.env` matches `VITE_API_KEY` in `frontend/.env`. |
-| Frontend shows "Error del servidor" | Confirm the backend is running and the `x-api-key` header is being sent in `Cartelera.tsx`. |
-| `npm run dev` only starts one app | Make sure `concurrently` is installed at the root: run `npm install` from the project root. |
+| `EADDRINUSE` on port 3000 or 5173 | Run `lsof -i :3000` and kill the process, or change `PORT` in `backend/.env`. |
+| `401 Unauthorized` | Confirm `API_KEY` matches `VITE_API_KEY`. Restart both servers after editing `.env`. |
+| CORS error in browser | Confirm `FRONTEND_URL` in `backend/.env` matches the URL where React is running. |
+| Frontend shows "Error del servidor" | Check the backend is running and the `x-api-key` header is being sent. |
+| `npm run dev` only starts one app | Run `npm install` from the project root to install `concurrently`. |
+| Swagger not loading | Check `SWAGGER_ENABLED` is not `false` and `@nestjs/swagger` is installed. |
